@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="zh‑CN">
+<head>
+    <meta charset="UTF‑8">
+    <meta name="viewport" content="width=device‑width, initial‑scale=1.0">
+    <title>513390 纳指ETF博时 溢价监控</title>
+    <style>
+        * {
+            box‑sizing: border‑box;
+            margin: 0;
+            padding: 0;
+            font‑family: system‑ui,‑apple‑system, BlinkMacSystemFont, sans‑serif;
+        }
+        body {
+            background‑color: #121212;
+            color:#eeeeee;
+            padding:16px;
+            max‑width:640px;
+            margin: 0 auto;
+        }
+        .card{
+            background:#1e1e1e;
+            border‑radius:12px;
+            padding:18px;
+            margin‑bottom:14px;
+        }
+        .big‑premium{
+            font‑size:38px;
+            font‑weight:bold;
+            margin:12px 0;
+        }
+        .tag{
+            display:inline‑block;
+            padding:7px 14px;
+            border‑radius:8px;
+            font‑weight:bold;
+        }
+        .tag‑discount{background:#00695c;}
+        .tag‑good{background:#0277bd;}
+        .tag‑observe{background:#ef6c00;}
+        .tag‑none{background:#616161;}
+        .row{
+            display:flex;
+            justify‑content:space‑between;
+            padding:8px 0;
+            border‑bottom:1px solid #333333;
+        }
+        .label{color:#aaaaaa;}
+        .tip{
+            font‑size:13px;
+            color:#999;
+            margin‑top:8px;
+        }
+        .loading{
+            color:#888;
+        }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <h2>513390｜纳指ETF博时</h2>
+        <div id="premiumVal" class="big‑premium">--</div>
+        <div id="statusTag" class="tag tag‑none">加载中...</div>
+        <div class="tip">页面每60秒自动刷新；仅展示行情，无告警推送</div>
+    </div>
+
+    <div class="card">
+        <div class="row"><span class="label">最新价格</span><span id="price">‑‑</span></div>
+        <div class="row"><span class="label">IOPV净值参考</span><span id="iopv">‑‑</span></div>
+        <div class="row"><span class="label">成交额</span><span id="amount">‑‑</span></div>
+        <div class="row"><span class="label">行情时间</span><span id="time">‑‑</span></div>
+    </div>
+
+    <script>
+        const TARGET_CODE = "513390";
+        let timer = null;
+
+        function getTagInfo(premium){
+            if(premium < 0){
+                return {"text":"折价","cls":"tag‑discount"};
+            }else if(premium <3){
+                return {"text":"较理想关注区间","cls":"tag‑good"};
+            }else if(premium <5){
+                return {"text":"可以观察","cls":"tag‑observe"};
+            }else{
+                return {"text":"未触发","cls":"tag‑none"};
+            }
+        }
+
+        async function fetchData(){
+            try{
+                // 调用公开行情接口
+                const resp = await fetch("https://push2.eastmoney.com/api/qt/clist/get?pn=1&pz=500&po=1&np=1&ut=bd1d9ddb04089700cf9c27f6f7426281&fltt=2&invt=2&fid=f3&fs=b:MK0010&fields=f12,f14,f2,f13,f18,f6");
+                const json = await resp.json();
+                const list = json.data.diff;
+                const item = list.find(x=>x.f12 === TARGET_CODE);
+                if(!item){
+                    throw new Error("未找到513390行情");
+                }
+                const price = item.f2;
+                const iopv = item.f18;
+                const amount = (item.f6 / 10000).toFixed(2);
+                const dt = new Date(item.f13);
+                const timeStr = dt.toLocaleString();
+                let premium = 0;
+                if(iopv && iopv >0){
+                    premium = ((price‑iopv)/iopv * 100).toFixed(2);
+                }
+
+                document.getElementById("premiumVal").innerText = premium + " %";
+                const tagObj = getTagInfo(parseFloat(premium));
+                const tagDom = document.getElementById("statusTag");
+                tagDom.className = "tag " + tagObj.cls;
+                tagDom.innerText = tagObj.text;
+
+                document.getElementById("price").innerText = price;
+                document.getElementById("iopv").innerText = iopv;
+                document.getElementById("amount").innerText = amount + " 万";
+                document.getElementById("time").innerText = timeStr;
+
+            }catch(err){
+                console.error(err);
+                document.getElementById("premiumVal").innerText = "获取失败";
+                document.getElementById("statusTag").innerText = "网络异常";
+            }
+        }
+
+        fetchData();
+        // 60秒刷新
+        timer = setInterval(fetchData, 60 * 1000);
+    </script>
+</body>
+</html>
